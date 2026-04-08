@@ -1,0 +1,56 @@
+{
+  "serial": {
+    "port": "COM7",
+    "baudrate": 57600,
+    "slave_id": 1,
+    "timeout": 0.5
+  },
+  "motion": {
+    "speed": 5.0,
+    "accel": 10.0,
+    "decel": 10.0
+  },
+  "homing": {
+    "method_cw": 1,
+    "method_ccw": 2,
+    "speed": 100,
+    "accel": 10.0,
+    "offset": 0
+  },
+  "conversion": {
+    "pulse_per_mm": 250.0
+  },
+  "points": [
+    {
+      "name": "P-01",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-02",
+      "position_mm": 100.0
+    },
+    {
+      "name": "P-03",
+      "position_mm": 500.0
+    },
+    {
+      "name": "P-04",
+      "position_mm": 700.0
+    }
+  ],
+  "startPoint": 1,
+  "distTolerance": 10,
+  "udp": {
+    "listen_port": 6667,
+    "send_port": 6666
+  },
+  "polling": {
+    "fast_ms": 100,
+    "slow_ms": 500
+  },
+  "auto_init_delay_ms": 1000,
+  "toggles": {
+    "auto_init": false,
+    "broadcast_position": true
+  }
+}
