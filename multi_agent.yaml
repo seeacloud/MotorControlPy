@@ -1,0 +1,9 @@
+skills:
+  - name: ui_agent
+    description: 生成Qt HMI界面，开关、按钮、仪表盘、图表
+  - name: control_agent
+    description: 生成伺服控制逻辑、串口、Modbus、急停、报警
+  - name: daq_agent
+    description: 生成实时数据采集、波形图、数据日志
+  - name: test_agent
+    description: 自动测试、模拟数据、打包exe

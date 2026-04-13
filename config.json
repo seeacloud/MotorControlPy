@@ -23,22 +23,50 @@
   "points": [
     {
       "name": "P-01",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-02",
-      "position_mm": 100.0
-    },
-    {
-      "name": "P-03",
       "position_mm": 500.0
     },
     {
-      "name": "P-04",
+      "name": "P-02",
       "position_mm": 700.0
+    },
+    {
+      "name": "P-03",
+      "position_mm": 1000.0
+    },
+    {
+      "name": "P-04",
+      "position_mm": 1400.0
+    },
+    {
+      "name": "P-05",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-06",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-07",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-08",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-09",
+      "position_mm": 300.0
+    },
+    {
+      "name": "P-10",
+      "position_mm": 400.0
+    },
+    {
+      "name": "P-11",
+      "position_mm": 400.0
     }
   ],
-  "startPoint": 1,
+  "startPoint": 0,
   "distTolerance": 10,
   "udp": {
     "listen_port": 6667,

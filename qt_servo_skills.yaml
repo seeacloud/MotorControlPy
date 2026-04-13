@@ -1,0 +1,90 @@
+skills:
+  # 1. 创建标准 Qt 主窗口（工控HMI专用）
+  - name: create_qt_hmi_window
+    description: 创建Python Qt工控主窗口，无边框/标题栏/状态栏/侧边栏
+    steps:
+      - 使用PySide6/PyQt6
+      - 创建主窗口，设置固定尺寸 1200×800
+      - 深色/浅色工业风格
+      - 顶部标题栏 + 底部状态栏
+      - 左侧菜单 + 右侧多页面板
+      - 代码规范、带注释、可直接运行
+    examples:
+      - prompt: 创建伺服电机HMI主窗口
+
+  # 2. 生成 Qt 开关组件（Switch/Toggle）
+  - name: create_qt_switch
+    description: 创建工业风格滑动开关，替代原生QCheckBox
+    steps:
+      - 自定义QSwitch样式
+      - 开启蓝色 / 关闭灰色
+      - 带文字标签
+      - 提供 stateChanged 信号
+    examples:
+      - prompt: 创建4个开关：回零、串口、自动初始化、发送实时位置
+
+  # 3. 创建 Qt 按钮面板（伺服控制专用）
+  - name: create_servo_button_panel
+    description: 创建伺服常用按钮：启动、停止、回零、点动、正反转
+    steps:
+      - 生成工业按钮样式
+      - 绑定点击函数
+      - 按钮布局整齐
+      - 急停按钮红色
+    examples:
+      - prompt: 创建伺服控制按钮区域
+
+  # 4. 生成 Qt 实时数据面板（位置/速度/电流）
+  - name: create_servo_dashboard
+    description: 创建实时显示面板：位置、速度、电流、状态
+    steps:
+      - 大号数字显示
+      - 单位：mm、rpm、A
+      - 自动刷新
+      - 报警红色提示
+    examples:
+      - prompt: 创建伺服实时数据仪表盘
+
+  # 5. 生成 Qt 串口通信逻辑（pyserial）
+  - name: generate_serial_communication
+    description: 生成稳定的串口收发逻辑，用于伺服控制
+    steps:
+      - 使用pyserial
+      - 打开/关闭/发送/接收/校验
+      - 16进制发送
+      - 线程安全，不卡UI
+      - 连接、发送、解析、显示
+    examples:
+      - prompt: 生成伺服电机串口通信代码
+
+  # 6. 生成 Modbus RTU 通信逻辑
+  - name: generate_modbus_rtu
+    description: 生成伺服驱动器Modbus RTU读写
+    steps:
+      - 使用minimalmodbus
+      - 读寄存器、写寄存器
+      - 错误处理
+      - 线程安全
+    examples:
+      - prompt: 生成Modbus RTU控制伺服代码
+
+  # 7. 自动生成按钮/开关功能逻辑
+  - name: bind_ui_functions
+    description: 根据按钮/开关名称自动绑定功能逻辑
+    steps:
+      - 读取UI组件名
+      - 自动生成点击/切换函数
+      - 连接串口/Modbus指令
+    examples:
+      - prompt: 绑定所有UI按钮功能
+
+  # 8. 自动测试 & 调试UI
+  - name: test_qt_ui_logic
+    description: 测试UI是否正常、信号是否绑定、串口是否通
+    steps:
+      - 运行测试
+      - 检查UI崩溃
+      - 模拟串口数据
+      - 输出测试报告
+    examples:
+      - prompt: 测试整个Qt HMI界面

@@ -1,0 +1,23 @@
+{
+    "mcp": {
+      "enabled": true,
+      "read_files": true,
+      "write_files": true,
+      "run_commands": true,
+      "allowed_commands": [
+        "python",
+        "pip",
+        "pyserial",
+        "pyqt6",
+        "pyside6",
+        "git"
+      ],
+      "allowed_dirs": [
+        "./"
+      ],
+      "auto_save": true,
+      "auto_format": true,
+      "ui_testing": true,
+      "serial_testing": true
+    }
+  }

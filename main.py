@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 
 from ui.main_window import MainWindow
-from ui.styles import STYLESHEET
 
 
 def setup_logging():
@@ -22,7 +21,6 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("JMC 伺服电机控制系统")
-    app.setStyleSheet(STYLESHEET)
 
     # 全局异常处理
     def exception_hook(exc_type, exc_value, exc_tb):

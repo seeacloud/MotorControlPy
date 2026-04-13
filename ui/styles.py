@@ -1,131 +1,141 @@
-"""应用样式表 + 自定义控件"""
+"""应用样式表 + 自定义控件 — Airbnb UI Style"""
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPropertyAnimation, pyqtProperty
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, pyqtSignal, QRect
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
 
 
+# === Airbnb 颜色常量 ===
+RAUSCH_RED = "#ff385c"
+RAUSCH_DARK = "#e00b41"
+TEXT_PRIMARY = "#222222"
+TEXT_SECONDARY = "#6a6a6a"
+TEXT_DISABLED = "#929292"
+SURFACE_BG = "#ffffff"
+SURFACE_SECONDARY = "#f2f2f2"
+BORDER = "#c1c1c1"
+BORDER_LIGHT = "#dddddd"
+GREEN = "#008a05"
+ORANGE = "#c77800"
+GRAY = "#929292"
+
 STYLESHEET = """
+* {
+    font-family:  'Microsoft YaHei';
+}
 QMainWindow {
-    background-color: #FFFFFF;
+    background-color: #ffffff;
 }
 
-QPushButton.pill {
-    border: 1px solid #2196F3;
-    border-radius: 20px;
-    color: #2196F3;
-    background-color: white;
-    padding: 10px 8px;
-    font-size: 13px;
-    min-height: 20px;
+QLabel#title {
+    font-size: 28px; font-weight: 700; margin-bottom: 4px;
+    color: #222222; letter-spacing: -0.44px;
 }
-QPushButton.pill:hover {
-    background-color: #E3F2FD;
+QLabel#pos-display {
+    font-size: 28px; font-weight: 600; color: #222222;
 }
-QPushButton.pill:pressed {
-    background-color: #BBDEFB;
+QLabel#cur-point {
+    font-size: 18px; font-weight: 600; color: #222222;
 }
-
-QPushButton.pill-stop {
-    border: 1px solid #F44336;
-    border-radius: 20px;
-    color: #F44336;
-    background-color: white;
-    padding: 10px 8px;
-    font-size: 13px;
-    min-height: 20px;
+QLabel#udp-msg {
+    font-size: 14px; color: #6a6a6a;
 }
-QPushButton.pill-stop:hover {
-    background-color: #FFEBEE;
+QLabel#status {
+    font-size: 16px; font-weight: 500; color: #222222;
 }
 
-QPushButton.blue-btn {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 10px 24px;
-    font-size: 14px;
-    min-height: 20px;
+QPushButton[class="pill"] {
+    border: 1px solid #222222; border-radius: 8px; color: #222222;
+    background-color: #ffffff; padding: 10px 16px; font-size: 14px;
+    font-weight: 500; min-height: 20px;
 }
-QPushButton.blue-btn:hover {
-    background-color: #1976D2;
+QPushButton[class="pill"]:hover {
+    background-color: #f2f2f2;
 }
-
-QPushButton.blue-btn-large {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 14px 32px;
-    font-size: 16px;
-    min-height: 30px;
-}
-QPushButton.blue-btn-large:hover {
-    background-color: #1976D2;
+QPushButton[class="pill"]:pressed {
+    background-color: #dddddd; color: #222222;
 }
 
-QPushButton.jog-btn {
-    border: 1px solid #E0E0E0;
-    border-radius: 4px;
-    background-color: #FAFAFA;
-    color: #333;
-    padding: 6px 10px;
-    font-size: 13px;
-    min-width: 40px;
+QPushButton[class="pill-stop"] {
+    border: 2px solid #ff385c; border-radius: 8px; color: #ff385c;
+    background-color: #ffffff; padding: 10px 16px; font-size: 14px;
+    font-weight: 600; min-height: 20px;
 }
-QPushButton.jog-btn:hover {
-    background-color: #EEEEEE;
+QPushButton[class="pill-stop"]:hover {
+    background-color: #fff0f3; color: #e00b41;
 }
-QPushButton.jog-btn:pressed {
-    background-color: #E0E0E0;
+QPushButton[class="pill-stop"]:pressed {
+    background-color: #ffe0e6;
 }
 
-QPushButton.point-action {
-    border: 1px solid #E0E0E0;
-    border-radius: 4px;
-    background-color: #FAFAFA;
-    color: #666;
-    padding: 4px 10px;
-    font-size: 12px;
+QPushButton[class="blue-btn"] {
+    background-color: #222222; color: #ffffff; border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 14px; font-weight: 500; min-height: 20px;
 }
-QPushButton.point-action:hover {
-    background-color: #EEEEEE;
+QPushButton[class="blue-btn"]:hover {
+    background-color: #ff385c;
 }
 
-QPushButton.point-delete {
-    border: none;
-    background-color: transparent;
-    color: #999;
-    font-size: 14px;
-    padding: 2px 6px;
+QPushButton[class="jog-btn"] {
+    border: 1px solid #c1c1c1; border-radius: 8px; background-color: #f2f2f2;
+    color: #222222; padding: 6px 10px; font-size: 14px; font-weight: 500; min-width: 40px;
 }
-QPushButton.point-delete:hover {
-    color: #F44336;
+QPushButton[class="jog-btn"]:hover {
+    background-color: #e8e8e8;
+}
+QPushButton[class="jog-btn"]:pressed {
+    background-color: #dddddd;
+}
+
+QPushButton[class="point-action"] {
+    border: 1px solid #c1c1c1; border-radius: 8px; background-color: #f2f2f2;
+    color: #222222; padding: 6px 12px; font-size: 13px; font-weight: 500;
+}
+QPushButton[class="point-action"]:hover {
+    background-color: #e8e8e8;
+}
+
+QPushButton[class="point-delete"] {
+    border: none; background-color: transparent; color: #929292;
+    font-size: 14px; padding: 2px 6px;
+}
+QPushButton[class="point-delete"]:hover { color: #ff385c; }
+QPushButton:focus {
+    outline: none;
 }
 
 QComboBox {
-    padding: 6px 12px;
-    border: 1px solid #E0E0E0;
-    border-radius: 6px;
-    background-color: #FAFAFA;
-    min-height: 20px;
+    padding: 6px 12px; border: 1px solid #c1c1c1; border-radius: 8px;
+    background-color: #ffffff; min-height: 20px; color: #222222;
+    font-size: 14px;
 }
 
 QLineEdit {
-    padding: 8px 12px;
-    border: 1px solid #E0E0E0;
-    border-radius: 6px;
-    background-color: white;
-    font-size: 16px;
-    font-weight: bold;
+    padding: 8px 12px; border: 1px solid #c1c1c1; border-radius: 8px;
+    background-color: #ffffff; font-size: 16px; font-weight: 600;
+    color: #222222;
+}
+QLineEdit:focus {
+    border: 2px solid #222222;
 }
 
-QScrollArea {
-    border: none;
-    background-color: white;
+QScrollArea { border: none; background-color: #ffffff; }
+
+QListWidget {
+    border: 1px solid #dddddd; border-radius: 20px; background: #ffffff;
+    font-size: 14px; color: #222222;
+}
+QListWidget:focus { outline: none; }
+QListWidget::item { padding: 8px 8px; }
+QListWidget::item:focus { outline: none; }
+QListWidget::item:selected {
+    background-color: #f2f2f2; color: #222222;
 }
 """
+
+
+def get_stylesheet() -> str:
+    return STYLESHEET
 
 
 class ToggleSwitch(QWidget):
@@ -170,7 +180,7 @@ class ToggleSwitch(QWidget):
         # 轨道
         track_rect = QRect(x_off, (self.height() - self._track_h) // 2,
                            self._track_w, self._track_h)
-        track_color = QColor("#2196F3") if self._checked else QColor("#E0E0E0")
+        track_color = QColor(TEXT_PRIMARY) if self._checked else QColor("#dddddd")
         p.setBrush(QBrush(track_color))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(track_rect, self._track_h // 2, self._track_h // 2)

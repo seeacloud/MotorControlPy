@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem, QAbstractItemView, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QShortcut, QKeySequence
 
 from config import AppConfig
 from protocol.modbus_client import ModbusClient
@@ -15,7 +16,7 @@ from core.motor_controller import MotorController, DeviceState
 from core.polling_service import PollingService
 from core.udp_service import UdpService
 from ui.point_manager import PointManager
-from ui.styles import ToggleSwitch
+from ui.styles import ToggleSwitch, get_stylesheet
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ class MainWindow(QMainWindow):
         self._auto_homing_done = False
 
         self._init_ui()
+        self._apply_theme()
         self._connect_signals()
         self._udp.start()
 
@@ -57,6 +59,12 @@ class MainWindow(QMainWindow):
 
         # 自动连接
         QTimer.singleShot(500, self._auto_connect)
+
+        # F12 调试面板
+        self._debug_inspector = None
+        QShortcut(QKeySequence(Qt.Key.Key_F12), self).activated.connect(
+            self._toggle_debug_inspector
+        )
 
     def _init_ui(self):
         central = QWidget()
@@ -71,20 +79,21 @@ class MainWindow(QMainWindow):
 
         # 标题
         title = QLabel("伺服电机控制面板")
+        title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-bottom: 4px;")
         left.addWidget(title)
 
-        # 状态行: 回零状态 | 串口状态 | 自动初始化toggle | 发送位置toggle
+        # 状态行: 回零状态 | 串口状态 | toggles
         status_toggle_row = QHBoxLayout()
         status_toggle_row.setSpacing(24)
         self._homing_status_label = QLabel("回零: 未完成")
+        self._homing_status_label.setObjectName("status")
         self._serial_status_label = QLabel("串口: 未连接")
-        for lbl in [self._homing_status_label, self._serial_status_label]:
-            lbl.setStyleSheet("font-size: 14px;")
-            status_toggle_row.addWidget(lbl)
-        self._auto_init_toggle = ToggleSwitch("自动初始化", self._cfg.toggle_auto_init)
-        self._broadcast_toggle = ToggleSwitch("发送实时位置", self._cfg.toggle_broadcast)
+        self._serial_status_label.setObjectName("status")
+        status_toggle_row.addWidget(self._homing_status_label)
+        status_toggle_row.addWidget(self._serial_status_label)
+        self._auto_init_toggle = ToggleSwitch("自动初始化    ", self._cfg.toggle_auto_init)
+        self._broadcast_toggle = ToggleSwitch("发送实时位置    ", self._cfg.toggle_broadcast)
         status_toggle_row.addWidget(self._auto_init_toggle)
         status_toggle_row.addWidget(self._broadcast_toggle)
         status_toggle_row.addStretch()
@@ -93,12 +102,12 @@ class MainWindow(QMainWindow):
         # 信息行: 实时位置 | 当前点位 | UDP Msg
         info_row = QHBoxLayout()
         info_row.setSpacing(24)
-        self._pos_display = QLabel("电机实时位置:0")
-        self._pos_display.setStyleSheet("font-size: 15px;")
+        self._pos_display = QLabel("位置: 0 mm")
+        self._pos_display.setObjectName("pos-display")
         self._cur_pt_label = QLabel("当前点位: --")
-        self._cur_pt_label.setStyleSheet("font-size: 15px;")
+        self._cur_pt_label.setObjectName("cur-point")
         self._udp_label = QLabel("UDP Msg: --")
-        self._udp_label.setStyleSheet("font-size: 15px;")
+        self._udp_label.setObjectName("udp-msg")
         info_row.addWidget(self._pos_display)
         info_row.addWidget(self._cur_pt_label)
         info_row.addWidget(self._udp_label)
@@ -107,7 +116,7 @@ class MainWindow(QMainWindow):
 
         # 控制按钮
         grid = QGridLayout()
-        grid.setSpacing(10)
+        grid.setSpacing(30)
         btn_defs = [
             ("上一个", "pill", 0, 0), ("下一个", "pill", 0, 1), ("起点", "pill", 0, 2),
             ("CCW100", "pill", 1, 0), ("CW100", "pill", 1, 1), ("停止", "pill-stop", 1, 2),
@@ -122,7 +131,7 @@ class MainWindow(QMainWindow):
 
         # Jog控制行: -100 -10 -1 [输入框] +1 +10 +100
         jog_row = QHBoxLayout()
-        jog_row.setSpacing(4)
+        jog_row.setSpacing(5)
         for delta in [-100, -10, -1]:
             btn = QPushButton(str(delta))
             btn.setProperty("class", "jog-btn")
@@ -141,7 +150,7 @@ class MainWindow(QMainWindow):
 
         # 底部行: 添加点位 | 启动 | 自动巡航
         pt_row = QHBoxLayout()
-        pt_row.setSpacing(10)
+        pt_row.setSpacing(30)
         self._add_pt_btn = QPushButton("添加点位")
         self._go_btn = QPushButton("启动")
         self._cruise_btn = QPushButton("自动巡航")
@@ -153,19 +162,15 @@ class MainWindow(QMainWindow):
 
         # === 右侧点位列表 ===
         right = QVBoxLayout()
-        right.setSpacing(8)
+        right.setSpacing(15)
         pt_title = QLabel("点位列表:")
-        pt_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2196F3;")
+        pt_title.setObjectName("cur-point")
         right.addWidget(pt_title)
+
 
         self._point_list = QListWidget()
         self._point_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self._point_list.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self._point_list.setStyleSheet("""
-            QListWidget { border: 1px solid #E0E0E0; border-radius: 6px; background: white; font-size: 14px; }
-            QListWidget::item { padding: 6px 8px; }
-            QListWidget::item:selected { background-color: #E3F2FD; color: #2196F3; }
-        """)
         self._point_list.model().rowsMoved.connect(self._on_points_reordered)
         self._point_list.currentRowChanged.connect(self._on_list_row_changed)
         right.addWidget(self._point_list, 1)
@@ -243,16 +248,18 @@ class MainWindow(QMainWindow):
 
     def _on_connection_changed(self, connected: bool):
         self._is_connected = connected
-        self._serial_status_label.setText(f"串口: {'已连接' if connected else '未连接'}")
         if connected:
+            self._serial_status_label.setText("串口: 已连接")
+            self._serial_status_label.setStyleSheet("font-size: 16px; color: #008a05; font-weight: 600;")
             self._polling.start(self._cfg.fast_poll_ms, self._cfg.slow_poll_ms)
             if self._auto_init_toggle.isChecked():
                 QTimer.singleShot(self._cfg.auto_init_delay_ms, self._auto_init)
             else:
-                # 不自动初始化时，回零状态直接显示已完成
                 self._homing_state = "已完成"
-                self._homing_status_label.setText("回零: 已完成")
+                self._update_homing_label()
         else:
+            self._serial_status_label.setText("串口: 未连接")
+            self._serial_status_label.setStyleSheet("font-size: 16px; color: #ff385c; font-weight: 600;")
             self._polling.stop()
 
     def _auto_init(self):
@@ -264,7 +271,7 @@ class MainWindow(QMainWindow):
     def _on_position(self, ts: float, pulse: int):
         self._current_pos_pulse = pulse
         mm = pulse / self._cfg.pulse_per_mm
-        self._pos_display.setText(f"电机实时位置:{mm:.0f}")
+        self._pos_display.setText(f"位置: {mm:.1f} mm")
         # 距离到达检测
         self._check_arrival(mm)
 
@@ -287,8 +294,8 @@ class MainWindow(QMainWindow):
     def _on_command_done(self, cmd: str, success: bool, msg: str):
         if cmd == "enable" and success and not self._auto_homing_done:
             self._auto_homing_done = True
-            self._homing_status_label.setText("回零: 回零进行中")
             self._homing_state = "回零进行中"
+            self._update_homing_label()
             self._controller.set_mode(OperationMode.HOMING)
             QTimer.singleShot(200, self._start_auto_homing)
         elif cmd == "homing_start" and success:
@@ -316,23 +323,23 @@ class MainWindow(QMainWindow):
                 self._homing_check_timer.stop()
                 del self._homing_check_timer
             self._homing_state = "已完成"
-            self._homing_status_label.setText("回零: 已完成")
+            self._update_homing_label()
             QTimer.singleShot(500, self._go_start_point)
 
     def _on_udp_msg(self, msg: str):
         self._udp_label.setText(f"UDP Msg: {msg}")
+        # UDP收到数字指令，移动到对应点位
+        stripped = msg.strip()
+        if stripped.isdigit():
+            idx = int(stripped) - 1  # "1"->index 0, "2"->index 1
+            if 0 <= idx < self._point_mgr.count:
+                self._goto_point(idx)
 
     def _send_udp_position(self):
         """30Hz定时发送实时位置 - 仅在移动中发送"""
         if self._broadcast_toggle.isChecked() and self._is_connected and self._target_pos_mm is not None:
             mm = self._current_pos_pulse / self._cfg.pulse_per_mm
             self._udp.send_position(mm)
-        # UDP收到数字指令，移动到对应点位
-        msg = msg.strip()
-        if msg.isdigit():
-            idx = int(msg) - 1  # "1"->index 0, "2"->index 1
-            if 0 <= idx < self._point_mgr.count:
-                self._goto_point(idx)
 
     # === 控制按钮 ===
 
@@ -379,7 +386,7 @@ class MainWindow(QMainWindow):
         self._auto_cruise_running = False
         self._target_pos_mm = None
         self._homing_state = "回零进行中"
-        self._homing_status_label.setText("回零: 回零进行中")
+        self._update_homing_label()
         # 先恢复控制字到使能状态，再切模式
         self._controller._control_word = 0x000F
         self._client.write_raw(0x6040, 0x000F)
@@ -394,7 +401,7 @@ class MainWindow(QMainWindow):
         self._auto_cruise_running = False
         self._target_pos_mm = None
         self._homing_state = "回零进行中"
-        self._homing_status_label.setText("回零: 回零进行中")
+        self._update_homing_label()
         self._controller._control_word = 0x000F
         self._client.write_raw(0x6040, 0x000F)
         self._controller.set_mode(OperationMode.HOMING)
@@ -494,6 +501,17 @@ class MainWindow(QMainWindow):
         if ret == QMessageBox.StandardButton.Yes:
             self._point_mgr.clear()
 
+    def _update_homing_label(self):
+        """根据回零状态更新标签文字和颜色"""
+        colors = {"已完成": "#008a05", "回零进行中": "#c77800", "未完成": "#929292"}
+        color = colors.get(self._homing_state, "#929292")
+        self._homing_status_label.setText(f"回零: {self._homing_state}")
+        self._homing_status_label.setStyleSheet(f"font-size: 16px; color: {color}; font-weight: 600;")
+
+    def _apply_theme(self):
+        """应用浅色主题"""
+        self.setStyleSheet(get_stylesheet())
+
     def _on_toggle_auto_init(self, checked: bool):
         self._cfg.toggle_auto_init = checked
 
@@ -529,36 +547,35 @@ class MainWindow(QMainWindow):
             # 起点红点
             if i == start_idx:
                 dot = QLabel("\u25cf")
-                dot.setStyleSheet("color: red; font-size: 14px;")
+                dot.setStyleSheet("color: #ff385c; font-size: 14px;")
                 dot.setFixedWidth(16)
                 h.addWidget(dot)
 
             if is_editing:
                 name_lbl = QLabel(f"{pt['name']}:")
-                name_lbl.setStyleSheet("color: #2196F3; font-weight: bold;")
+                name_lbl.setStyleSheet("color: #222222; font-weight: 600;")
                 h.addWidget(name_lbl)
                 edit_input = QLineEdit(str(int(pt['position_mm'])))
                 edit_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                edit_input.setFixedWidth(70)
-                edit_input.setStyleSheet("border: 1.5px solid #2196F3; border-radius: 3px; padding: 1px 4px;")
+                edit_input.setFixedWidth(80)
                 h.addWidget(edit_input)
                 self._active_edit_input = edit_input
             else:
-                label = QLabel(f"{pt['name']}:{pt['position_mm']:.0f}")
+                label = QLabel(f"{pt['name']}: {pt['position_mm']:.0f} mm")
                 if is_current:
-                    label.setStyleSheet("color: #2196F3; font-weight: bold;")
+                    label.setStyleSheet("color: #222222; font-weight: 600;")
                 h.addWidget(label)
 
             h.addStretch()
             go_btn = QPushButton("Go")
-            go_btn.setFixedSize(36, 24)
-            go_btn.setStyleSheet("border: 1px solid #ccc; border-radius: 3px; font-size: 12px;")
+            go_btn.setFixedSize(44, 28)
+            go_btn.setProperty("class", "point-action")
             go_btn.clicked.connect(lambda _, idx=i: self._goto_point(idx))
             h.addWidget(go_btn)
 
             from PyQt6.QtCore import QSize
             item = QListWidgetItem()
-            item.setSizeHint(QSize(0, 44))
+            item.setSizeHint(QSize(0, 52))
             self._point_list.addItem(item)
             self._point_list.setItemWidget(item, row)
 
@@ -610,3 +627,18 @@ class MainWindow(QMainWindow):
             self._controller.disable()
         self._client.shutdown()
         event.accept()
+
+    def _toggle_debug_inspector(self):
+        """F12 切换调试面板"""
+        if self._debug_inspector is None:
+            from ui.debug_inspector import DebugInspector
+            self._debug_inspector = DebugInspector(self)
+            self.addDockWidget(
+                Qt.DockWidgetArea.RightDockWidgetArea,
+                self._debug_inspector,
+            )
+        else:
+            vis = not self._debug_inspector.isVisible()
+            self._debug_inspector.setVisible(vis)
+            if vis:
+                self._debug_inspector.refresh_tree()
