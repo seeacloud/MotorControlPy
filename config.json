@@ -6,7 +6,7 @@
     "timeout": 0.5
   },
   "motion": {
-    "speed": 5.0,
+    "speed": 20.0,
     "accel": 10.0,
     "decel": 10.0
   },
@@ -15,7 +15,7 @@
     "method_ccw": 2,
     "speed": 100,
     "accel": 10.0,
-    "offset": 0
+    "offset": 3000
   },
   "conversion": {
     "pulse_per_mm": 250.0
@@ -23,7 +23,7 @@
   "points": [
     {
       "name": "P-01",
-      "position_mm": 500.0
+      "position_mm": 50.0
     },
     {
       "name": "P-02",
@@ -39,31 +39,7 @@
     },
     {
       "name": "P-05",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-06",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-07",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-08",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-09",
-      "position_mm": 300.0
-    },
-    {
-      "name": "P-10",
-      "position_mm": 400.0
-    },
-    {
-      "name": "P-11",
-      "position_mm": 400.0
+      "position_mm": 4300.0
     }
   ],
   "startPoint": 0,
@@ -78,7 +54,7 @@
   },
   "auto_init_delay_ms": 1000,
   "toggles": {
-    "auto_init": false,
+    "auto_init": true,
     "broadcast_position": true
   }
 }

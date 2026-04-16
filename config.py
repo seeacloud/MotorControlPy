@@ -23,7 +23,7 @@ _DEFAULTS = {
         "method_ccw": 2,
         "speed": 100,
         "accel": 10.0,
-        "offset": 0
+        "offset": 3000
     },
     "conversion": {
         "pulse_per_mm": 250.0
@@ -94,6 +94,10 @@ class AppConfig:
 
     @property
     def move_speed(self) -> float: return self._data["motion"]["speed"]
+    @move_speed.setter
+    def move_speed(self, val: float):
+        self._data["motion"]["speed"] = val
+        self.save()
     @property
     def move_accel(self) -> float: return self._data["motion"]["accel"]
     @property

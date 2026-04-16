@@ -148,6 +148,34 @@ class MainWindow(QMainWindow):
             jog_row.addWidget(btn)
         left.addLayout(jog_row)
 
+        # 速度调节行: [-10] [-1] [速度输入框] [+1] [+10] [保存]
+        speed_row = QHBoxLayout()
+        speed_row.setSpacing(5)
+        speed_label = QLabel("速度:")
+        speed_label.setObjectName("status")
+        speed_row.addWidget(speed_label)
+        for delta in [-10, -1]:
+            btn = QPushButton(str(delta))
+            btn.setProperty("class", "jog-btn")
+            btn.clicked.connect(lambda _, d=delta: self._speed_adjust(d))
+            speed_row.addWidget(btn)
+        self._speed_input = QLineEdit()
+        self._speed_input.setText(str(self._cfg.move_speed))
+        self._speed_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._speed_input.setFixedWidth(100)
+        speed_row.addWidget(self._speed_input)
+        for delta in [1, 10]:
+            btn = QPushButton(f"+{delta}")
+            btn.setProperty("class", "jog-btn")
+            btn.clicked.connect(lambda _, d=delta: self._speed_adjust(d))
+            speed_row.addWidget(btn)
+        self._speed_save_btn = QPushButton("保存")
+        self._speed_save_btn.setProperty("class", "point-action")
+        self._speed_save_btn.clicked.connect(self._save_speed)
+        speed_row.addWidget(self._speed_save_btn)
+        speed_row.addStretch()
+        left.addLayout(speed_row)
+
         # 底部行: 添加点位 | 启动 | 自动巡航
         pt_row = QHBoxLayout()
         pt_row.setSpacing(30)
@@ -215,6 +243,7 @@ class MainWindow(QMainWindow):
         self._client.error.connect(lambda msg: logger.error(msg))
         self._polling.position_updated.connect(self._on_position)
         self._polling.status_updated.connect(self._on_status)
+        self._polling.error_updated.connect(self._on_error)
         self._controller.state_changed.connect(self._on_state_changed)
         self._controller.command_done.connect(self._on_command_done)
         self._udp.message_received.connect(self._on_udp_msg)
@@ -263,8 +292,18 @@ class MainWindow(QMainWindow):
             self._polling.stop()
 
     def _auto_init(self):
-        if self._is_connected:
-            self._controller.enable()
+        """自动初始化: 清除电机残留状态 → 故障复位 → 使能 → 回零"""
+        if not self._is_connected:
+            return
+        # 1) 清除控制字，让电机回到未就绪状态
+        self._controller._control_word = 0x0000
+        self._client.write_raw(0x6040, 0x0000)
+        # 2) 故障复位(bit7上升沿)，防止残留故障阻止使能
+        QTimer.singleShot(200, lambda: self._client.write_raw(0x6040, 0x0080))
+        QTimer.singleShot(400, lambda: self._client.write_raw(0x6040, 0x0000))
+        # 3) 重置内部标志，然后执行使能序列
+        self._auto_homing_done = False
+        QTimer.singleShot(600, self._controller.enable)
 
     # === 轮询数据 ===
 
@@ -291,7 +330,19 @@ class MainWindow(QMainWindow):
     def _on_state_changed(self, state: int):
         pass
 
+    def _on_error(self, error_word: int):
+        """处理错误寄存器"""
+        if error_word == 0:
+            return
+        from protocol.register_map import ERROR_BITS
+        errors = [desc for bit, desc in ERROR_BITS.items() if error_word & (1 << bit)]
+        error_str = ", ".join(errors) if errors else f"未知错误(0x{error_word:04X})"
+        logger.error(f"电机故障: {error_str} (error_word=0x{error_word:04X})")
+        self._homing_status_label.setText(f"故障: {error_str}")
+        self._homing_status_label.setStyleSheet("font-size: 16px; color: #ff385c; font-weight: 600;")
+
     def _on_command_done(self, cmd: str, success: bool, msg: str):
+        logger.info(f"命令完成: {cmd}, 成功={success}, 消息={msg}")
         if cmd == "enable" and success and not self._auto_homing_done:
             self._auto_homing_done = True
             self._homing_state = "回零进行中"
@@ -324,7 +375,22 @@ class MainWindow(QMainWindow):
                 del self._homing_check_timer
             self._homing_state = "已完成"
             self._update_homing_label()
-            QTimer.singleShot(500, self._go_start_point)
+            logger.info("回零完成，准备切换到位置模式并去起点")
+            # 回零完成后，重新走使能序列，确保控制字干净
+            self._controller._control_word = 0x0000
+            self._client.write_raw(0x6040, 0x0000)
+            QTimer.singleShot(200, lambda: self._client.write_raw(0x6040, 0x0006))
+            QTimer.singleShot(400, lambda: self._client.write_raw(0x6040, 0x0007))
+            QTimer.singleShot(600, lambda: self._client.write_raw(0x6040, 0x000F))
+            QTimer.singleShot(700, lambda: self._controller.set_mode(OperationMode.POSITION))
+            QTimer.singleShot(800, self._after_homing_enable)
+
+    def _after_homing_enable(self):
+        """回零完成后重新使能完毕，更新内部状态并去起点"""
+        self._controller._control_word = 0x000F
+        self._controller._state = DeviceState.ENABLED
+        logger.info("使能恢复完成，去起点")
+        QTimer.singleShot(300, self._go_start_point)
 
     def _on_udp_msg(self, msg: str):
         self._udp_label.setText(f"UDP Msg: {msg}")
@@ -346,11 +412,14 @@ class MainWindow(QMainWindow):
     def _move_to_mm(self, mm: float):
         self._target_pos_mm = mm
         pulse = int(mm * self._cfg.pulse_per_mm)
-        # 确保控制字干净(清除暂停等状态)
-        self._controller._control_word = 0x000F
-        self._client.write_raw(0x6040, 0x000F)
-        self._controller.set_mode(OperationMode.POSITION)
-        QTimer.singleShot(150, lambda: self._controller.start_position_move(
+        logger.info(f"移动到 {mm}mm (pulse={pulse}), 速度={self._cfg.move_speed}, 当前模式={self._controller.current_mode}")
+        # 保持使能(0x000F)，清除 bit4 和暂停位，确保后续上升沿有效
+        self._controller._control_word = 0x000F & ~(1 << 4) & ~(1 << 8)
+        self._client.write_raw(0x6040, self._controller._control_word & 0xFFFF)
+        # 仅在非位置模式时切换，避免中断正在执行的运动
+        if self._controller.current_mode != OperationMode.POSITION:
+            self._controller.set_mode(OperationMode.POSITION)
+        QTimer.singleShot(200, lambda: self._controller.start_position_move(
             target=pulse, speed=self._cfg.move_speed,
             accel=self._cfg.move_accel, decel=self._cfg.move_decel, absolute=True,
         ))
@@ -448,6 +517,27 @@ class MainWindow(QMainWindow):
         except ValueError:
             return
         self._move_to_mm(mm)
+
+    def _speed_adjust(self, delta: float):
+        """调节速度值"""
+        try:
+            val = float(self._speed_input.text()) + delta
+        except ValueError:
+            val = self._cfg.move_speed + delta
+        val = max(1, min(50, val))
+        self._speed_input.setText(str(round(val, 1)))
+
+    def _save_speed(self):
+        """保存速度到 config.json"""
+        try:
+            val = float(self._speed_input.text())
+            val = max(1, min(50, val))
+            self._speed_input.setText(str(round(val, 1)))
+            self._cfg.move_speed = val
+            self._speed_save_btn.setText("已保存")
+            QTimer.singleShot(1500, lambda: self._speed_save_btn.setText("保存"))
+        except ValueError:
+            pass
 
     # === 点位管理 ===
 
@@ -623,6 +713,9 @@ class MainWindow(QMainWindow):
         self._auto_cruise_running = False
         self._polling.stop()
         self._udp.stop()
+        # 清除控制字，确保电机回到干净状态
+        self._controller._control_word = 0x0000
+        self._client.write_raw(0x6040, 0x0000)
         if self._controller.is_enabled:
             self._controller.disable()
         self._client.shutdown()
