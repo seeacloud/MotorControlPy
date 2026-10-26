@@ -2,11 +2,12 @@
 
 import logging
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout,
+    QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout,
     QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QListWidget,
-    QListWidgetItem, QAbstractItemView, QMessageBox,
+    QListWidgetItem, QAbstractItemView, QMessageBox, QMenu, QStyle,
+    QSystemTrayIcon,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtGui import QShortcut, QKeySequence
 
 from config import AppConfig
@@ -46,9 +47,12 @@ class MainWindow(QMainWindow):
         self._editing_point_index = -1
         self._active_edit_input = None
         self._auto_homing_done = False
+        self._motor_disabled_after_arrival = False  # 到达点位后是否已停止使能
+        self._pending_move_mm: float | None = None  # 等待重新使能后执行的移动目标
 
         self._init_ui()
         self._apply_theme()
+        self._init_tray()
         self._connect_signals()
         self._udp.start()
 
@@ -65,6 +69,45 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_F12), self).activated.connect(
             self._toggle_debug_inspector
         )
+
+    def _init_tray(self):
+        """创建系统托盘图标和快捷菜单。"""
+        icon = self.windowIcon()
+        if icon.isNull():
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
+            self.setWindowIcon(icon)
+
+        self._tray_icon = QSystemTrayIcon(icon, self)
+        self._tray_icon.setToolTip("伺服电机控制系统")
+
+        self._tray_menu = QMenu(self)
+        show_action = self._tray_menu.addAction("显示主窗口")
+        show_action.triggered.connect(self._restore_from_tray)
+        self._tray_menu.addSeparator()
+        quit_action = self._tray_menu.addAction("退出")
+        quit_action.triggered.connect(self.close)
+
+        self._tray_icon.setContextMenu(self._tray_menu)
+        self._tray_icon.activated.connect(self._on_tray_activated)
+        self._tray_icon.show()
+
+    def _on_tray_activated(self, reason):
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            self._restore_from_tray()
+
+    def _restore_from_tray(self):
+        """恢复主窗口并将其置于前台。"""
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
+            QTimer.singleShot(0, self.hide)
 
     def _init_ui(self):
         central = QWidget()
@@ -323,9 +366,21 @@ class MainWindow(QMainWindow):
             # 发送UDP点位通知
             if self._current_point_index >= 0:
                 self._udp.send_point_arrival(self._current_point_index)
+            # 500ms后停止使能
+            QTimer.singleShot(500, self._disable_after_arrival)
             # 自动巡航: 到达后去下一个
             if self._auto_cruise_running:
                 QTimer.singleShot(300, self._cruise_next)
+
+    def _disable_after_arrival(self):
+        """到达点位500ms后停止电机使能，减少发热和噪音"""
+        if self._target_pos_mm is not None:
+            return  # 已经有新的移动指令，不再停止使能
+        if self._auto_cruise_running:
+            return  # 自动巡航中不停止使能
+        self._controller.disable()
+        self._motor_disabled_after_arrival = True
+        logger.info("到达点位，已停止电机使能")
 
     def _on_state_changed(self, state: int):
         pass
@@ -394,8 +449,18 @@ class MainWindow(QMainWindow):
 
     def _on_udp_msg(self, msg: str):
         self._udp_label.setText(f"UDP Msg: {msg}")
-        # UDP收到数字指令，移动到对应点位
         stripped = msg.strip()
+        navigation_commands = {
+            "l": self._go_prev_point,
+            "r": self._go_next_point,
+            "h": self._go_start_point,
+        }
+        handler = navigation_commands.get(stripped.lower())
+        if handler:
+            handler()
+            return
+
+        # 数字指令按点位序号移动，例如 "1" 对应第一个点位。
         if stripped.isdigit():
             idx = int(stripped) - 1  # "1"->index 0, "2"->index 1
             if 0 <= idx < self._point_mgr.count:
@@ -411,6 +476,34 @@ class MainWindow(QMainWindow):
 
     def _move_to_mm(self, mm: float):
         self._target_pos_mm = mm
+        # 如果电机因到达点位而停止使能，先重新使能再移动
+        if self._motor_disabled_after_arrival:
+            self._pending_move_mm = mm
+            self._motor_disabled_after_arrival = False
+            logger.info(f"电机未使能，先重新使能，目标={mm}mm")
+            # 完整CiA 402使能序列
+            self._controller._control_word = 0x0000
+            self._client.write_raw(0x6040, 0x0000)
+            QTimer.singleShot(100, lambda: self._client.write_raw(0x6040, 0x0006))
+            QTimer.singleShot(200, lambda: self._client.write_raw(0x6040, 0x0007))
+            QTimer.singleShot(300, lambda: self._client.write_raw(0x6040, 0x000F))
+            QTimer.singleShot(400, self._execute_pending_move)
+            return
+        self._do_move(mm)
+
+    def _execute_pending_move(self):
+        """重新使能完成后，执行挂起的移动指令"""
+        if self._pending_move_mm is None:
+            return
+        mm = self._pending_move_mm
+        self._pending_move_mm = None
+        self._controller._control_word = 0x000F
+        self._controller._state = DeviceState.ENABLED
+        logger.info(f"重新使能完成，执行移动到 {mm}mm")
+        self._do_move(mm)
+
+    def _do_move(self, mm: float):
+        """实际执行位置移动"""
         pulse = int(mm * self._cfg.pulse_per_mm)
         logger.info(f"移动到 {mm}mm (pulse={pulse}), 速度={self._cfg.move_speed}, 当前模式={self._controller.current_mode}")
         # 保持使能(0x000F)，清除 bit4 和暂停位，确保后续上升沿有效
@@ -454,6 +547,7 @@ class MainWindow(QMainWindow):
     def _homing_cw(self):
         self._auto_cruise_running = False
         self._target_pos_mm = None
+        self._motor_disabled_after_arrival = False
         self._homing_state = "回零进行中"
         self._update_homing_label()
         # 先恢复控制字到使能状态，再切模式
@@ -469,6 +563,7 @@ class MainWindow(QMainWindow):
     def _homing_ccw(self):
         self._auto_cruise_running = False
         self._target_pos_mm = None
+        self._motor_disabled_after_arrival = False
         self._homing_state = "回零进行中"
         self._update_homing_label()
         self._controller._control_word = 0x000F
@@ -483,6 +578,7 @@ class MainWindow(QMainWindow):
     def _stop_motion(self):
         self._auto_cruise_running = False
         self._target_pos_mm = None
+        self._motor_disabled_after_arrival = False  # 停止时清除标志
         self._controller.pause()  # 暂停运动，保持使能
 
     def _toggle_auto_cruise(self):
@@ -713,6 +809,7 @@ class MainWindow(QMainWindow):
         self._auto_cruise_running = False
         self._polling.stop()
         self._udp.stop()
+        self._tray_icon.hide()
         # 清除控制字，确保电机回到干净状态
         self._controller._control_word = 0x0000
         self._client.write_raw(0x6040, 0x0000)
@@ -720,6 +817,7 @@ class MainWindow(QMainWindow):
             self._controller.disable()
         self._client.shutdown()
         event.accept()
+        QApplication.instance().quit()
 
     def _toggle_debug_inspector(self):
         """F12 切换调试面板"""

@@ -2,8 +2,17 @@
 
 import json
 import os
+import sys
 
-CONFIG_FILE = "config.json"
+
+def _application_dir() -> str:
+    """打包后使用 EXE 所在目录，源码运行时使用项目目录。"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+CONFIG_FILE = os.path.join(_application_dir(), "config.json")
 
 # 默认配置
 _DEFAULTS = {
