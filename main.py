@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 
 from ui.main_window import MainWindow
+from version import APP_VERSION
 
 
 def resource_path(relative_path: str) -> Path:
@@ -32,6 +33,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("JMC 伺服电机控制系统")
+    app.setApplicationVersion(APP_VERSION)
     app.setWindowIcon(QIcon(str(resource_path("ui/app_icon.ico"))))
     app.setQuitOnLastWindowClosed(False)
 
@@ -43,7 +45,10 @@ def main():
     sys.excepthook = exception_hook
 
     window = MainWindow()
-    window.hide()
+    if window.start_minimized:
+        window.hide()
+    else:
+        window.show()
 
     sys.exit(app.exec())
 

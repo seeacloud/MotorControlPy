@@ -7,13 +7,13 @@
   },
   "motion": {
     "speed": 20.0,
-    "accel": 10.0,
-    "decel": 10.0
+    "accel": 5.0,
+    "decel": 5.0
   },
   "homing": {
     "method_cw": 1,
     "method_ccw": 2,
-    "speed": 100,
+    "speed": 10,
     "accel": 10.0,
     "offset": 3000
   },
@@ -54,7 +54,9 @@
   },
   "auto_init_delay_ms": 1000,
   "toggles": {
-    "auto_init": true,
-    "broadcast_position": true
+    "auto_init": false,
+    "broadcast_position": true,
+    "start_minimized": false,
+    "disable_on_arrival": false
   }
 }

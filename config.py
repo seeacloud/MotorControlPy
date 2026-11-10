@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from copy import deepcopy
 
 
 def _application_dir() -> str:
@@ -51,7 +52,9 @@ _DEFAULTS = {
     "auto_init_delay_ms": 1000,
     "toggles": {
         "auto_init": True,
-        "broadcast_position": True
+        "broadcast_position": True,
+        "start_minimized": True,
+        "disable_on_arrival": True
     }
 }
 
@@ -83,7 +86,8 @@ class AppConfig:
             pass
 
     def _merge(self, defaults: dict, override: dict) -> dict:
-        result = dict(defaults)
+        # 深拷贝避免配置实例修改嵌套字典时污染全局默认值。
+        result = deepcopy(defaults)
         for k, v in override.items():
             if k in result and isinstance(result[k], dict) and isinstance(v, dict):
                 result[k] = self._merge(result[k], v)
@@ -109,8 +113,16 @@ class AppConfig:
         self.save()
     @property
     def move_accel(self) -> float: return self._data["motion"]["accel"]
+    @move_accel.setter
+    def move_accel(self, val: float):
+        self._data["motion"]["accel"] = val
+        self.save()
     @property
     def move_decel(self) -> float: return self._data["motion"]["decel"]
+    @move_decel.setter
+    def move_decel(self, val: float):
+        self._data["motion"]["decel"] = val
+        self.save()
 
     @property
     def homing_method_cw(self) -> int: return self._data["homing"]["method_cw"]
@@ -118,6 +130,10 @@ class AppConfig:
     def homing_method_ccw(self) -> int: return self._data["homing"]["method_ccw"]
     @property
     def homing_speed(self) -> int: return self._data["homing"]["speed"]
+    @homing_speed.setter
+    def homing_speed(self, val: int):
+        self._data["homing"]["speed"] = val
+        self.save()
     @property
     def homing_accel(self) -> float: return self._data["homing"]["accel"]
     @property
@@ -167,4 +183,20 @@ class AppConfig:
     @toggle_broadcast.setter
     def toggle_broadcast(self, val: bool):
         self._data.setdefault("toggles", {})["broadcast_position"] = val
+        self.save()
+
+    @property
+    def toggle_start_minimized(self) -> bool:
+        return self._data.get("toggles", {}).get("start_minimized", True)
+    @toggle_start_minimized.setter
+    def toggle_start_minimized(self, val: bool):
+        self._data.setdefault("toggles", {})["start_minimized"] = val
+        self.save()
+
+    @property
+    def toggle_disable_on_arrival(self) -> bool:
+        return self._data.get("toggles", {}).get("disable_on_arrival", True)
+    @toggle_disable_on_arrival.setter
+    def toggle_disable_on_arrival(self, val: bool):
+        self._data.setdefault("toggles", {})["disable_on_arrival"] = val
         self.save()

@@ -39,6 +39,8 @@ class TestAppConfigDefaults:
     def test_toggle_defaults(self, tmp_config):
         assert tmp_config.toggle_auto_init is True
         assert tmp_config.toggle_broadcast is True
+        assert tmp_config.toggle_start_minimized is True
+        assert tmp_config.toggle_disable_on_arrival is True
 
 
 class TestAppConfigPersistence:
@@ -48,10 +50,22 @@ class TestAppConfigPersistence:
         cfg_file = str(tmp_path / "config.json")
         cfg1 = AppConfig(cfg_file)
         cfg1.toggle_auto_init = False
+        cfg1.toggle_start_minimized = False
+        cfg1.toggle_disable_on_arrival = False
+        cfg1.move_speed = 12.5
+        cfg1.homing_speed = 250
+        cfg1.move_accel = 15.5
+        cfg1.move_decel = 18.5
         cfg1.start_point = 3
 
         cfg2 = AppConfig(cfg_file)
         assert cfg2.toggle_auto_init is False
+        assert cfg2.toggle_start_minimized is False
+        assert cfg2.toggle_disable_on_arrival is False
+        assert cfg2.move_speed == 12.5
+        assert cfg2.homing_speed == 250
+        assert cfg2.move_accel == 15.5
+        assert cfg2.move_decel == 18.5
         assert cfg2.start_point == 3
 
     def test_points_persistence(self, tmp_path):

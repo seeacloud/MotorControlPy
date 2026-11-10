@@ -53,7 +53,7 @@ DebugInspector QHeaderView::section {
     color: #d4d4d4;
     border: 1px solid #3c3c3c;
     padding: 3px 6px;
-    font-weight: 600;
+    font-weight: 400;
 }
 DebugInspector QPlainTextEdit {
     background-color: #1e1e1e;
@@ -67,7 +67,7 @@ DebugInspector QPushButton {
     border: none;
     border-radius: 3px;
     padding: 4px 10px;
-    font-weight: 500;
+    font-weight: 400;
     min-height: 18px;
 }
 DebugInspector QPushButton:hover {
@@ -299,7 +299,7 @@ class DebugInspector(QDockWidget):
         qss_layout.setSpacing(4)
 
         qss_label = QLabel("QSS Editor")
-        qss_label.setStyleSheet("font-weight: 600; padding: 2px;")
+        qss_label.setStyleSheet("font-weight: 400; padding: 2px;")
         qss_layout.addWidget(qss_label)
 
         self._qss_editor = QPlainTextEdit()
